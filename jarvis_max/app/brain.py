@@ -1,5 +1,7 @@
 import os
 import logging
+import aiohttp
+import json
 logger = logging.getLogger("jarvis.brain")
 
 class AIBrain:
@@ -20,10 +22,42 @@ class AIBrain:
             return await self._single_provider(query)
             
     async def _single_provider(self, query):
-        # Placeholder for single provider call
-        return f"Response from {self.current_provider}: This is a response to '{query}'"
+        # Use DeepSeek API
+        api_key = self.providers.get(self.current_provider)
+        if not api_key:
+            return f"Error: No API key found for {self.current_provider}"
+            
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        data = {
+            'model': 'deepseek-chat',
+            'messages': [
+                {'role': 'user', 'content': query}
+            ],
+            'stream': False
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    'https://api.deepseek.com/chat/completions',
+                    headers=headers,
+                    json=data,
+                    timeout=30
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return result['choices'][0]['message']['content']
+                    else:
+                        error_text = await response.text()
+                        return f"API Error: {response.status} - {error_text}"
+        except Exception as e:
+            return f"Error calling DeepSeek API: {str(e)}"
         
     async def _meta_consensus(self, query):
-        # Placeholder for meta-consensus
+        # For now, just use single provider
         logger.info("Using meta-consensus for query")
-        return f"Meta-consensus response to: {query}"
+        return await self._single_provider(query)
