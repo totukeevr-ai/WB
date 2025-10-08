@@ -18,9 +18,22 @@ class TelegramBot:
         user_message = update.message.text
         logger.info(f"Received Telegram message: {user_message}")
         
-        # Process through AI brain
-        response = await self.brain.process_query(user_message)
-        await update.message.reply_text(response)
+        try:
+            # Validate input
+            if not user_message or len(user_message.strip()) == 0:
+                await update.message.reply_text("Please provide a valid message")
+                return
+                
+            if len(user_message) > 1000:
+                await update.message.reply_text("Message too long. Please keep it under 1000 characters.")
+                return
+            
+            # Process through AI brain
+            response = await self.brain.process_query(user_message)
+            await update.message.reply_text(response)
+        except Exception as e:
+            logger.error(f"Error handling Telegram message: {str(e)}")
+            await update.message.reply_text("Sorry, I encountered an error processing your message. Please try again.")
         
     def run(self):
         if not self.token:

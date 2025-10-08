@@ -18,6 +18,14 @@ from .telegram_bot import TelegramBot
 
 load_dotenv()
 
+# Validate required environment variables
+required_vars = ['TELEGRAM_BOT_TOKEN', 'DEEPSEEK_API_KEY']
+missing_vars = [var for var in required_vars if not os.getenv(var)]
+if missing_vars:
+    logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
+    # Don't exit immediately to allow partial functionality
+    # In production, you might want to exit
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -63,17 +71,32 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             logger.info(f"Received via WebSocket: {data}")
             
-            # Process the query through AI brain
-            response = await brain.process_query(data)
-            await websocket.send_text(f"AI Response: {response}")
+            # Validate input
+            if not data or len(data.strip()) == 0:
+                await websocket.send_text("Error: Empty query")
+                continue
+                
+            if len(data) > 1000:
+                await websocket.send_text("Error: Query too long")
+                continue
             
-            # Optionally, execute commands if they're in the response
-            if "execute:" in response.lower():
-                command = response.split("execute:")[-1].strip()
-                result = await executor.execute_command(command)
-                await websocket.send_text(f"Command result: {result}")
+            try:
+                # Process the query through AI brain
+                response = await brain.process_query(data)
+                await websocket.send_text(f"AI Response: {response}")
+                
+                # Optionally, execute commands if they're in the response
+                if "execute:" in response.lower():
+                    command = response.split("execute:")[-1].strip()
+                    result = await executor.execute_command(command)
+                    await websocket.send_text(f"Command result: {result}")
+            except Exception as e:
+                logger.error(f"Error processing query: {str(e)}")
+                await websocket.send_text(f"Error processing your request: {str(e)}")
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

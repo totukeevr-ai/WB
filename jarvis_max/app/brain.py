@@ -25,6 +25,7 @@ class AIBrain:
         # Use DeepSeek API
         api_key = self.providers.get(self.current_provider)
         if not api_key:
+            logger.error(f"No API key found for provider: {self.current_provider}")
             return f"Error: No API key found for {self.current_provider}"
             
         headers = {
@@ -53,9 +54,17 @@ class AIBrain:
                         return result['choices'][0]['message']['content']
                     else:
                         error_text = await response.text()
+                        logger.error(f"API Error {response.status}: {error_text}")
                         return f"API Error: {response.status} - {error_text}"
+        except asyncio.TimeoutError:
+            logger.error("API request timed out")
+            return "Error: Request timed out. Please try again."
+        except aiohttp.ClientError as e:
+            logger.error(f"Network error: {str(e)}")
+            return f"Network error: {str(e)}"
         except Exception as e:
-            return f"Error calling DeepSeek API: {str(e)}"
+            logger.error(f"Unexpected error: {str(e)}")
+            return f"Error processing your request: {str(e)}"
         
     async def _meta_consensus(self, query):
         # For now, just use single provider
